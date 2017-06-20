@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+	    <title>SER421 Lab 5 - Activity 2</title>
+	    <meta charset="UTF-8">
+	    <meta name="author" content="Rudi Wever">
+	    <link rel="shortcut icon" href="eicon.png"/>
+	    <style>
+	        html{background-color: aliceblue;padding-top: 10px;}
+	        body{width: 523px; height: 775px;background-color: #FBBE00;background-repeat: no-repeat;border: 6px outset black;border-radius: 4px;box-shadow: 10px 10px 5px grey;margin: 0 auto;}
+	        #wrapper {padding: 0px 10px;}
+	        header{width: 100%; padding-bottom: 13px; border-bottom: 1px solid black;}
+	        #content {height: 367px;max-height: 367px;margin-top: 8px; overflow: auto;}
+	        .finger{font-size: 120%;}
+	        header{background: url(./header.png);background-repeat: no-repeat;height: 285px;margin-top: -35px;}
+	        h1,h2{color: black;text-shadow: 1px 2px 2px antiquewhite;text-align: center;}
+	        h1{padding-top: 100px;font-size: 450%;}
+	        h2{font-size: 100%;margin-top: -50px;}
+	        p{margin: 0px;}
+	        button{margin-top:5px; float: right;margin-right: 6px;}
+	        button:hover{box-shadow: 3px 3px 2px black;}
+	        button:active{transform: translateY(3px);}
+	        footer{background-color: black; margin-top: 5px;font-size: 85%;width: 85%;max-height: 3.4em;}
+	        img{margin-left: 8em;}
+	        i{text-align: center;color: navajowhite;position: fixed;margin-top: 1em;}
+	    </style>
+	</head>
+
+	<body>
+	    <div id='wrapper'>
+	        <header>
+	            <h1>Eliza</h1>
+	            <h2>SER421 Lab5 - Activity 2</h2>
+	        </header>
+
+	        <div id="content" scrolling="auto">
+	            <p>What's your name?</p>        
+	        </div>
+	     
+	        <div>
+	            <p>Talk to me:</p>
+	            <input id="txtInput" name="userinput" size="79" autofocus>
+	            <div id="bar"></div>
+	        </div>
+	        
+	        <div id="clear">
+	            <button id="btnClear" type="button"><b>CLEAR</b></button>
+	        </div>
+	        <footer>
+	            <p><img src="./eicon2.png"><i>Copyright &#169; 2016. Rudi Wever</i></p>
+	        </footer>
+	    </div>
+	</body>
+
+    <script>
+        var myName = "";
+        var gotName = false;
+        var gotGreeting = false;
+        var initText = "";
+        var inactiveTimer = 0;
+        var inactiveAmount = 5000;          //20 seconds
+        var greetings = [];
+        var timedOutMessages = [];
+        var myDictionary = [];              //dictionary with all keys and phrases
+        var alreadyDisplayedAnswers = [];   //a corresponding array with the already displayed phrases
+        
+        var textBoxContents = "";
+        var go = false;
+        /*
+        * The initial dictionary
+        */
+        var elizaJson ='[' +
+        '{"key": ["default"],'+
+        '"phrase": ["Can you tell me a little more about that <name>?", "Please <name> elaborate!", "Fascinating! Tell me more!", "Hmm...that\'s quite interesting.  Do go on.", "Cool!  I want to hear more about that.", "What do you mean?", "So what do you think about that?", "I haven\'t got a clue about that!  I\'d like to hear more.", "Well, how do you like that?"]'+
+        '},'+
+        '{"key": ["good", "great", "amazing"],'+
+        '"phrase": ["That\'s great to hear!", "Tell me more!", "I love hearing that!", "Can\'t argue with that, eh?", "Wow!  You\'ve got to be kidding!", "Really?  That\'s pretty cool.", "Awesome!  Keep it up <name>."]'+
+        '},'+
+        '{"key": ["joke", "jokes", "funny"],'+
+        '"phrase": ["What do you get when you cross a joke with a rhetorical question?", "Your mom is so mean, she has no standard deviation.", "I have kleptomania, but when it gets bad, I take something for it.", "You can\'t lose a homing pigeon. If your homing pigeon doesn\'t come back, then what you\'ve lost is a pigeon."]'+
+        '},'+
+        '{"key": ["job", "work"],'+
+        '"phrase": ["You couldn\'t pay me enough to do that.", "I wish I had that job!", "Whew!  Nose to the grindstone, eh?", "You must be working very hard on that.", "Well I would like to change the world too, but Avery won\'t give me the source code."]'+
+        '},'+
+        '{"key": ["home", "live"],'+
+        '"phrase": ["How do you like it there?", "I just stay right here.  All the time."]'+
+        '},'+
+        '{"key": ["bad", "sad", "mad"],'+
+        '"phrase": ["Aw, jeez.  That\'s a bummer.", "I\'m sure everything will work out though.", "I would give you a hug, but I have no arms.", "I would suggest having a stiff drink.", "Gosh, I hate to hear that.", "I wish I could help.", "What a pity!"]'+
+        '},'+
+        '{"key": ["bored", "question"],'+
+        '"phrase": ["Well, what do you like to do?", "Read any good books lately?", "Seen any movies worth watching?", "Do you play any games?"]'+
+        '},'+
+        '{"key": ["computer", "program", "software", "smart"],'+
+        '"phrase": ["Computers make very fast, very accurate mistakes.", "Well, you know what they say: never underestimate the bandwidth of a station wagon full of tapes hurling down the highway.", "Like I always say, there are 10 types of people - those who understand binary, and those who don\'t.", "Well, if at first you don\'t succeed...call it version 1.0, right?", "My artificial intelligence beats real stupidity any day!"]'+
+        '}'+
+        ']';
+
+        
+        window.onload=init;
+        
+        function init(){
+            var textElement = document.getElementById("txtInput");
+            textElement.onkeyup=keyup;       
+            var buttonElement = document.getElementById("btnClear");
+            buttonElement.onclick=resetPage; 
+            initText = document.getElementById("content").innerHTML;            //get original content
+            createGreetings();
+            createTimeoutMessages();
+            createDictionary();
+        }
+
+        function keyup(e){
+            var textarea = document.getElementById('content');
+
+			if (document.getElementById("txtInput").value!=""){
+	            if (e.keyCode==13){
+		            try{
+		                var text = document.getElementById("txtInput").value;       //get user name
+		                var newDictionay = JSON.parse(text);                        //new dictionary object
+		                //add new dictionary to existing dictionary
+		                addToDictionary(newDictionay);
+		                document.getElementById("txtInput").value="";               //clear text box
+		                var msg = "<p>I just got smarter!</p>";
+		                var content = document.getElementById("content").innerHTML; //get existing content
+		                document.getElementById("content").innerHTML=content+msg;
+		                textarea.scrollTop = textarea.scrollHeight;
+
+		            }
+		            catch(err){
+		                if (!gotName){
+		                    console.log('keyUP');
+		                    var text = document.getElementById("txtInput").value;       //get user name
+		                    myName = text;                                              //put user name in global
+		                    document.getElementById("txtInput").value="";               //clear text box
+		    				//text = "<p>" + text + "</p>"
+		                    var greet = getGreeting(myName);                            //get a greeting
+		                    var content = document.getElementById("content").innerHTML; //get existing content
+		                    document.getElementById("content").innerHTML=content+greet; //display content + greeting
+		                    inactiveTimer = setTimeout(displayTimeOutMsg,inactiveAmount);//ready-set-go! timer is set
+
+				   			//var content = document.getElementById("content").innerHTML;
+							//var newline = "<p>" + myName + " > " + text + "</p>"; 
+		  					//document.getElementById("content").innerHTML=content+text;            
+		                    gotName = true;
+		                }
+		               	else{
+		                    var text = document.getElementById("txtInput").value;       //get text
+		                    document.getElementById("txtInput").value="";               //clear text box
+
+		                    var prompt = getNextPrompt(text);                           //get a prommpt
+		                    var newLine1 = "<p>" + myName + " <span class='finger'>&#9755;</span> " + text + "</p>"       //assemble user content header
+		                    var newLine2 = "<p>Eliza <span class='finger'>&#9755;</span> " + prompt + "</p>"              //assemble next Eliza content header
+		                    var content = document.getElementById("content").innerHTML  //get existing content
+		                    document.getElementById("content").innerHTML=content+newLine1+newLine2; //display content + newLine1 + newLine2
+		                    textarea.scrollTop = textarea.scrollHeight;
+		                }
+
+		            }
+        		}
+
+	            if (gotName){
+	                console.log('about to fire timer');
+	                clearTimeout(inactiveTimer);
+	                inactiveTimer = setTimeout(displayTimeOutMsg,inactiveAmount);
+	            }
+        	}
+		}
+
+        function addToDictionary(newDictionaryObject){
+            for (var i=0; i<newDictionaryObject.length; i++){
+                myDictionary.push(newDictionaryObject[i]);          //adds new element from new dictionary to original dictionary
+                initializeLastDisplayedAnswers();                   //add new element with false phrase flags, without affecting original dictionary phrase flags
+            }   
+        }
+        
+        function initializeLastDisplayedAnswers(){
+            var myTempAnswers = [];
+            for (var i=0; i<myDictionary[(myDictionary.length-1)].phrase.length; i++){
+                myTempAnswers.push(false);
+            }
+            alreadyDisplayedAnswers[(myDictionary.length-1)]=myTempAnswers;
+        }
+        
+        function chooseTimeOutMsg(nameParam){
+            var tempAnswers = [];                           
+            for (var i=0; i<timedOutMessages.length; i++){
+                if (timedOutMessages[i][1]==false){                //if flag is false then timedOutMessage is available
+                    tempAnswers.push([timedOutMessages[i][0],i]);  //push timedOutMessage to available pool
+                }
+            }
+
+            if (tempAnswers.length==0){ //all have been previously selected. So clear them all
+                for (var i=0; i< (timedOutMessages.length); i++){
+                    timedOutMessages[i][1] = false;                //reset all timedOutMessage flags
+                    tempAnswers.push([timedOutMessages[i][0],i]);  //available pool now has all timedOutMessages available
+                }
+            }
+	
+            //Randomize the selection from tempAnswers
+            var select = randomInteger(0,tempAnswers.length-1);
+            var temp = tempAnswers[select][0];
+            var result = temp.replace("\<name\>", nameParam);  //replace <name> with nameParam
+            var index = tempAnswers[select][1];
+            timedOutMessages[index][1] = true;                     //mark timedOutMessage flag as being used
+            return (result);            
+        }
+        
+        function createDictionary(){
+            myDictionary = JSON.parse(elizaJson);                   //create myDictionary object
+            initializeDisplayedAnswers();
+        }
+        
+        /*
+        * Creates the initial greetings array
+        */
+        function createGreetings(){
+            greetings.push(['<name> how is your day going?', false]);
+            greetings.push(['<name>, is something troubling you?', false]);
+            greetings.push(['<name> you seem happy, why is that?', false]);
+        }
+
+        function createTimeoutMessages(){
+            timedOutMessages.push(["<name>, I'm waiting here!", false]);
+            timedOutMessages.push(["Whatsa matter <name>, cat got your tongue?", false]);
+        }
+        
+        function displayTimeOutMsg(){
+            console.log('time out occured');
+            //choose timeout message(@param myName) and capture into string
+            var nextPrompt = chooseTimeOutMsg(myName);
+            textBoxContents = document.getElementById("txtInput").value;       //get textbox contents
+            console.log(textBoxContents);
+            alert(nextPrompt);
+            inactiveTimer = setTimeout(displayTimeOutMsg,inactiveAmount);
+        }
+        
+        /*
+        * getGreeting chooses a greeting that hasn't be displayed
+        */
+        function getGreeting(nameParam){
+            var tempAnswers = [];                           
+            for (var i=0; i<greetings.length; i++){
+                if (greetings[i][1]==false){                //if flag is false then greeting is available
+                    tempAnswers.push([greetings[i][0],i]);  //push greeting to available pool
+                }
+            }
+
+            if (tempAnswers.length==0){ //all have been previously selected. So clear them all
+                for (var i=0; i< (greetings.length); i++){
+                    greetings[i][1] = false;                //reset all greeting flags
+                    tempAnswers.push([greetings[i][0],i]);  //available pool now has all greetings available
+                }
+            }
+	
+            //Randomize the selection from tempAnswers
+            var select = randomInteger(0,tempAnswers.length-1);
+            var temp = tempAnswers[select][0];
+            var result = temp.replace("\<name\>", nameParam);  //replace <name> with nameParam
+            var index = tempAnswers[select][1];
+            greetings[index][1] = true;                     //mark greeting flag as being used
+            return (result);
+        }
+
+        /*
+         * returns the index to the last keyword found in inputLine else 0
+         */
+        function getKeywordIndex(inputLine){
+            var upperLine = inputLine.toUpperCase();
+            var found = 0;
+            for (var k = 1; k < myDictionary.length; k++){ //for all keywords indexes
+                var keys = '';
+                for (var i =0; i< myDictionary[k].key.length-1; i++){ //aggregate the first i-1
+                    keys = keys + (myDictionary[k].key[i]).toUpperCase() + '|';
+                }
+                keys = keys + ( myDictionary[k].key[(myDictionary[k].key.length-1)].toUpperCase());// add the last one
+                var location = upperLine.search(keys);
+                if (location>-1){
+                    found = k;
+                }
+            }
+            return (found);
+        }
+        
+        function getNextPrompt(userInput){
+            var keyNumber = 0;
+            keyNumber = getKeywordIndex(userInput);
+            var result = getNextPhrase(keyNumber);
+            return result;
+        }
+        
+		/*
+		* Returns the next prompt based on the keyNumber
+		* If a prompt has been previously selected (indicated by true) then it will not be selected unless
+		* all the prompts in this group has been previously selected.
+		*/
+		function getNextPhrase(keyNumber){
+			var tempAnswers = [];
+			for (var i=0; i<alreadyDisplayedAnswers[keyNumber].length; i++){
+				if (alreadyDisplayedAnswers[keyNumber][i]==false){
+					tempAnswers.push(i);
+				}
+			}
+			
+			if (tempAnswers.length==0){ //all have been previously selected. So clear them all
+				for (var i=0; i< (alreadyDisplayedAnswers[keyNumber].length); i++){
+					alreadyDisplayedAnswers[keyNumber][i] = false;
+					tempAnswers.push(i);
+				}
+			}
+			
+			//Randomize the selection from tempAnswers
+			var select = randomInteger(0,tempAnswers.length-1);
+			var index = tempAnswers[select];
+			var temp = myDictionary[keyNumber].phrase[index];
+			alreadyDisplayedAnswers[keyNumber][index] = true;
+			var result = temp.replace("\<name\>", myName);
+			return (result);
+		}
+        
+        /*
+        * Initialize the alreadyDisplayedAnswers array to all false
+        * The array is coresponding to the current dictionary ()
+        * Used to keep track of already displayed answered
+        * false = not displayed
+        */
+        function initializeDisplayedAnswers(){
+
+            for (var k=0; k<myDictionary.length; k++){
+                var myTempAnswers = [];
+                for (var i=0; i<myDictionary[k].phrase.length; i++){
+                    myTempAnswers.push(false);
+                }
+                alreadyDisplayedAnswers[k]=myTempAnswers;
+            }
+        }
+        
+        
+        //returns a random integer between low (inclusive) and high (inclusive)
+        function randomInteger (low, high) {
+            return Math.floor(Math.random() * (high - low + 1) + low);
+        }
+        
+        function resetPage(e){
+            if (inactiveTimer){
+                clearTimeout(inactiveTimer);
+            }
+            gotName =false;
+            document.getElementById("txtInput").value="";                       //clear text box
+            document.getElementById("content").innerHTML=initText;              //reset page to original content
+            document.getElementById("txtInput").focus();                        //reset focus on text box
+        }
+        
+
+    </script>
+
+</html> 
